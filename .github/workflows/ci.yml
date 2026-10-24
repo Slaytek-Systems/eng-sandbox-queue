@@ -24,10 +24,15 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npx --no-install eng --help >/dev/null
-  eng-merge-gate:
+  queued-gate:                      # posts eng-merge-gate for the queued commit; never name a job eng-merge-gate
     if: github.event_name == 'merge_group'
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      statuses: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,11 +41,6 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - name: merge gate (main's eng-standard and main's config)
+      - run: npx --no-install eng merge gate --post-status --config-from origin/main
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          git fetch -q origin main
-          git worktree add -q "$RUNNER_TEMP/base" origin/main
-          (cd "$RUNNER_TEMP/base" && npm ci --silent)
-          node "$RUNNER_TEMP/base/node_modules/@slayteksystems/eng-standard/bin/eng.mjs" merge gate --config-from origin/main
