@@ -1,0 +1,36 @@
+# The one required check (eng-standard v0.10.0, queue mode): eng merge gate from main's eng-standard pin and main's config.
+name: ci
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number this run checks (auto-revert dispatch)
+        required: false
+        default: ''
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+jobs:
+  eng-merge-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx --no-install eng --help >/dev/null
+      - name: merge gate (main's eng-standard and main's config)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch -q origin main
+          git worktree add -q "$RUNNER_TEMP/base" origin/main
+          (cd "$RUNNER_TEMP/base" && npm ci --silent)
+          node "$RUNNER_TEMP/base/node_modules/@slayteksystems/eng-standard/bin/eng.mjs" merge gate --config-from origin/main

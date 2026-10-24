@@ -1,0 +1,7 @@
+{
+  "name": "eng-sandbox-queue",
+  "private": true,
+  "devDependencies": {
+    "@slayteksystems/eng-standard": "github:Slaytek-Systems/eng-standard#01ffce0f1437102ab59c9b4301d871b56af9204d"
+  }
+}

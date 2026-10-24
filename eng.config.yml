@@ -1,0 +1,345 @@
+# eng.config.yml: every setting and decision for this repo. Owner: Matt. Agents draft changes; Matt approves.
+# Run `eng sync` after editing. `eng drift-check` fails if generated files differ from what this renders.
+version: 1
+
+project:
+  name: eng-sandbox-queue
+  default_branch: main
+  protected_branches: [ main ] # Never rebased, force-pushed or deleted. Feature branches may be rebased (pstack).
+  commands:
+    test: node -e 0
+
+# ---------------- STACK: every choice is a DRAFT decision for Matt ----------------
+stack:
+  status: DRAFT # DRAFT until Matt marks each decision APPROVED.
+  defaults:
+    language:
+      {
+        use: TypeScript (strict),
+        why: "One language across UI, backend and Convex; agents are strongest in it.",
+        decision: DRAFT
+      }
+    runtime:
+      {
+        use: "Node 24 via vp (vp env); Bun for scripts and the Convex CLI",
+        why: "vp test/check/build are Node-hosted and Confect needs Node >= 24; Bun runs
+          one-off scripts and `bun x convex` fast (Convex Bun quickstart).",
+        decision: DRAFT
+      }
+    package_manager:
+      {
+        use: "bun via vp install/add/remove, packageManager pinned in package.json (e.g.
+          bun@1.4.3)",
+        why: "Vite+ supports bun as a package manager and installs with whatever
+          packageManager pins; proven in proof-log/14.",
+        decision: DRAFT
+      }
+    test_runner:
+      {
+        use: "vp test (Vitest) as the single runner, incl. convex-test (edge-runtime
+          project) and parity/property tests",
+        why: "One runner; convex-test needs Vite (import.meta.glob) and fails under bun
+          test; Vitest 5 + convex-test 0.0.61 proven in proof-log/14.",
+        decision: DRAFT
+      }
+    lint_format:
+      {
+        use: "vp check (Oxfmt + type-aware Oxlint) with ignorePatterns for
+          .agents/.claude/.cursor/.eng/.intent/generated/_generated/fallow-base\
+          lines/*.md, + eng lint for custom rules",
+        why: "Oxc is what Vite+ bundles; without ignores vp check formats vendored skill
+          files (106 files in proof-log/14).",
+        decision: DRAFT
+      }
+    build_dev:
+      {
+        use: "vp dev/build for web apps, vp pack for libraries; vp run for tasks, cache
+          only on side-effect-free tasks (cache: false for scripts with
+          effects)",
+        why: "Vite+ unifies Vite/Rolldown/tsdown; vp run cache hits replay output
+          without running the command.",
+        decision: DRAFT
+      }
+    backend:
+      {
+        use: Convex,
+        why: "Reactive DB + functions with generated types; already used in
+          thinksmart/motus/infotech.",
+        decision: DRAFT
+      }
+    effects:
+      {
+        use: "Effect (with Confect for Convex)",
+        why: "Typed errors/services/schemas; Confect is the maintained Effect<->Convex
+          framework (community, not Convex-official).",
+        decision: DRAFT
+      }
+    codebase_analysis:
+      {
+        use: "Fallow (npm fallow, exact pin) for the module graph: unused
+          files/exports/deps, cycles, boundaries, duplication, complexity",
+        why: "Linters see one file; fallow sees the project graph
+          (fallow.tools/docs/explanations/fallow-vs-linters). Rust-native, MIT,
+          zero-config for Vite/Vitest/Convex. Replaces knip and jscpd;
+          complements vp check and eng lint.",
+        decision: DRAFT
+      }
+    agent_activity_ui:
+      {
+        use: "shadcn Trace (`pnpm dlx shadcn@latest add trace`; Trace, TraceLine,
+          TraceIcon, TraceTitle, TraceDescription, TraceCollapsible*), with AI
+          Elements and Code Block where relevant",
+        why: "When an app shows agent or AI activity to users (reasoning, tool calls,
+          subagents, queues, plans, sources), use Trace instead of custom UI:
+          one abstraction, AI SDK parts, a11y built in. Published by shadcn 14
+          Oct 2026. Docs: https://ui.shadcn.com/docs/components/trace",
+        decision: DRAFT
+      }
+    proofs:
+      {
+        use: "Bend2 for laws on core pure logic",
+        why: "Machine-checked invariants as backpressure; only binds Bend code, so scope
+          it to small pure modules.",
+        decision: DRAFT
+      }
+  languages:
+    allowed: [ typescript, javascript, bend ]
+    justified_when:
+      # DRAFT. A new language needs a stack.exceptions entry with one of these reasons.
+      rust: "Hot path where measured CPU/memory cost of TS is the bottleneck, a
+        native/systems boundary (e.g. core-edge), or a library only available in
+        Rust. Not for preference."
+      python: "Data/ML work that depends on a Python-only library, kept behind a
+        service boundary."
+      other: "Only with a measured reason TS cannot meet, an owner, and a rollback
+        plan."
+  frameworks:
+    allowed:
+      [
+        convex,
+        effect,
+        "@confect/server",
+        vite,
+        vite-plus,
+        vitest,
+        oxlint,
+        fallow
+      ]
+  exceptions: [] # e.g. {kind: language|framework|package_manager, name: rust, reason: "...", approved_by: Mattslayga}
+  notes:
+    - "Bun vs Vite+: vp test/check/build run on Node (vp manages Node); bun is
+      the package manager under vp (viteplus.dev/guide, llms-full.txt). Bun
+      runtime is for scripts and the Convex CLI, run via `vp run` or `bun`."
+    - "Confect needs Node >= 24 for its CLI, TS strict:true, and only a subset
+      of Effect Schema (confect.dev quickstart)."
+    - "Convex functions run in Convex's runtime regardless of local runtime
+      choice; the toolchain only affects CLI, codegen, tests and the app shell."
+
+agents:
+  harnesses: [ claude-code, codex, cursor ] # AGENTS.md is read by Codex and Cursor; CLAUDE.md imports it.
+  skills_dir: .agents/skills
+  skills:
+    # <source>/<name>. Vendored copies at pins in pkg/vendor/PINS.txt; eng/* are ours.
+    - pstack/* # the full pstack set (55 skills + 2 subagents), pinned in pkg/vendor/PINS.txt
+    - pocock/grilling
+    - pocock/grill-with-docs
+    - pocock/domain-modeling
+    - eng/eng-verify
+    - eng/find-the-laws
+    - eng/write-law-and-proof
+    - eng/law-conformance
+    - pi-intent/intent-conformance
+    - eng/property-test
+    - eng/add-gate
+    - eng/custom-lint
+    - eng/eng-retro # learning loop: eng retro (copies pocock/retro + pstack correct)
+    - pocock/retro
+    - eng/e2e-flow
+    - eng/eng-stack
+    - eng/eng-route # stage router + how to name a skill when spawning/steering a thread
+    - fallow/fallow # official, version-matched to the pinned CLI (pkg/vendor/PINS.txt)
+    - fallow/fallow-setup
+
+merge:
+  owner: GitHub merge queue with auto-merge (eng merge gate). No human merges
+  command: gh pr merge <n> --auto --squash
+  method: squash
+  auto:
+    mode: queue
+    check: eng-merge-gate
+    workflow: ci.yml
+    base: main
+    second_provider_paths:
+      - .github/**
+      - eng.config.yml
+      - scripts/**
+      - package.json
+      - package-lock.json
+      - "**/auth/**"
+      - "**/billing/**"
+    post_merge:
+      check: bash scripts/post-merge-check.sh
+    stuck_minutes: 2
+    verdict_wait_minutes: 2
+
+ship:
+  # Shipping model (approved by Matt, 13 Oct 2026).
+  manager: lead agent # One per repo. Never authors code. Only actor that merges, reverts and reorders.
+  manager_also: [ releases, deploys ] # optional extra duties; [] if a human or another job owns them
+  author: merge-ready only # The author agent gets its PR to merge-ready and never merges.
+  verifier: fresh-context agent # Verdict bound to the head SHA / patch-id (eng verdict).
+  # merge_queue: off. GitHub merge queue needs Enterprise Cloud for private repos. The shipping manager runs the serial loop
+  # in SHIPPING.md instead. Set merge_queue: { provider, max_group_size, ci_trigger } only to opt in (eng then warns if CI lacks merge_group).
+  # v0.10.0 no-human-merge rule (eng-standard runs it): merge.queue { check, second_provider_paths, post_merge.check, stuck_minutes,
+  # verdict_wait_minutes } plus eng merge gate|watch|post. Needs a GitHub merge queue (org-owned repo). See docs/merge-queue.md.
+  high_risk:
+    # Matt approves these before the manager merges. Everything else merges once verified, new behaviour behind a default-off flag.
+    label: risk:high
+    reasons: [ auth, payments, schema/migrations, public APIs, CI, production data ]
+    paths:
+      [
+        "**/auth/**",
+        "**/payments/**",
+        "migrations/**",
+        "**/schema.*",
+        "**/api/**",
+        ".github/workflows/**",
+        ".buildkite/**",
+        ".eng/ci/**"
+      ]
+  split_bot_when: "concurrent PR load or release work outgrows the lead agent"
+
+verification:
+  checks_dir: .eng/checks # One executable check per behaviour. Exit 0 = behaviour present.
+  flake_runs: 3 # maintain runs each check this many times; mixed results = FLAKY = fail.
+  stale_after_commits: 50
+  repeat_threshold: 2 # A mistake seen this often must become a rule or check.
+
+e2e:
+  provider: e2e # tester-army/e2e: open source (Apache-2.0), Playwright-based, runs locally/CI, no TesterArmy account.
+  version: 0.19.0 # Pre-1.0: pinned exactly; eng e2e fails on a caret range.
+  web_version: 0.14.0 # @e2e-dev/web (pins playwright-core 1.63.0).
+  model: none # none = exact locators only, no key. Else an AI SDK model in e2e.config.ts agents, e.g. ollama('qwen3:4b') via ollama-ai-provider-v2 (local).
+  node_bin: /workspace/eng-standard/.tools/node24/bin # e2e CLI needs Node >=24.8 (or ^22.22.3); box default is Node 20.
+  evidence_dir: .eng/evidence # Video, screenshots, trace.md, junit.xml land in <evidence_dir>/<sha>/e2e/.
+  flake_runs: 3 # A new or changed e2e test must pass this many consecutive runs (eng e2e --flake-check) before it may block. Mixed = quarantine + issue.
+  policy:
+    # When e2e runs (approved by Matt, 13 Oct 2026). `eng e2e-required` prints the decision for a diff.
+    mode: path_based # path_based: PRs run e2e only when needed (below). always: every PR runs it (the old rule).
+    labels: [ risk:high ] # a PR with any of these labels always runs e2e
+    unmatched: run # a changed file no list below matches: run (safe default) or skip
+    run_on:
+      # PR touches any of these -> e2e required. Lists replace the default for that key; omit a key to keep its default.
+      e2e: [ "**/*.e2e.ts", "e2e.config.ts", "e2e/**", "tests/e2e/**" ] # the flows themselves
+      app:
+        [
+          "src/**",
+          "app/**",
+          "convex/**",
+          "components/**",
+          "lib/**",
+          "public/**",
+          "index.html"
+        ]
+      routes:
+        [
+          "**/routes/**",
+          "**/pages/**",
+          "**/api/**",
+          "**/router.*",
+          "**/*.routes.*"
+        ]
+      db:
+        [
+          "migrations/**",
+          "**/migrations/**",
+          "**/schema.*",
+          "**/*.sql",
+          "prisma/**",
+          "drizzle/**"
+        ]
+      build:
+        [
+          "package.json",
+          "bun.lock",
+          "bun.lockb",
+          "package-lock.json",
+          "pnpm-lock.yaml",
+          "yarn.lock",
+          "vite.config.*",
+          "tsconfig*.json",
+          "Dockerfile"
+        ] # deps and build config change what ships
+      ci:
+        [
+          ".github/workflows/**",
+          ".buildkite/**",
+          ".eng/ci/**",
+          "eng.config.yml",
+          "e2e.config.*"
+        ] # CI config is never "config-only"
+    skip_on:
+      # PR whose files ALL land here -> e2e not required. tests/docs win over run_on (src/x.test.ts is test-only).
+      tests:
+        [
+          "**/*.test.*",
+          "**/*.spec.*",
+          "**/__tests__/**",
+          "test/**",
+          "tests/**",
+          ".eng/checks/**",
+          ".eng/rule-proofs/**"
+        ]
+      docs:
+        [
+          "**/*.md",
+          "**/*.mdx",
+          "docs/**",
+          "**/LICENSE*",
+          ".agents/**",
+          ".claude/**"
+        ]
+      config:
+        [
+          "**/*.json",
+          "**/*.yml",
+          "**/*.yaml",
+          "**/*.toml",
+          "**/.*rc",
+          "**/.*rc.*",
+          "**/.gitignore",
+          "**/.editorconfig",
+          ".githooks/**",
+          "fallow-baselines/**",
+          "**/.env.example"
+        ]
+    main:
+      # The backstop. Always full e2e on main; a red run there = shipping manager reverts at once (SHIPPING.md).
+      on_merge: full # schema constant: full e2e after every merge to main
+      nightly: { enabled: false, cron: "0 16 * * *" } # optional; true renders .eng/ci/e2e-nightly.yml (03:00 AEDT). Create the schedule by hand.
+
+hygiene:
+  # Disk hygiene (SHIPPING.md §5). eng gate / eng e2e always run with a per-run $ENG_TMP removed on exit.
+  tmp_lint: true # eng lint rule test-bare-tmpdir: test code may not write to bare os.tmpdir() or /tmp. false = off (say why).
+  tmp_max_age_hours: 6 # eng clean: eng-<repo>-* temp dirs older than this (and whose process is gone) are stale.
+  disk_lint: true # eng lint built-in disk rules: script-bare-tmpdir, cargo-target-tmp, deno-dir-unstable, container-no-rm, volume-prune-all, credential-to-disk.
+  scratch_root: "${XDG_CACHE_HOME}/eng/${repo}/scratch" # repo-owned root, never /tmp. eng launch/verdict round/gate/e2e make one 0700 round dir here per run and remove it on exit.
+  caches:
+    # one shared build cache per toolchain per repo; eng exports the env var to every child (eng doctor requires each toolchain the repo uses).
+    cargo_target: "${XDG_CACHE_HOME}/eng/${repo}/cargo-target" # CARGO_TARGET_DIR (+ CARGO_INCREMENTAL=0)
+    vite: "${XDG_CACHE_HOME}/eng/${repo}/vite" # ENG_VITE_CACHE_DIR; vite.config: cacheDir: process.env.ENG_VITE_CACHE_DIR ?? 'node_modules/.vite'
+    bun: "${XDG_CACHE_HOME}/eng/${repo}/bun" # BUN_INSTALL_CACHE_DIR
+    deno: "${XDG_CACHE_HOME}/eng/${repo}/deno" # DENO_DIR (stable, never per run)
+  containers: { label: eng.repo } # run --rm, or --label "$ENG_CONTAINER_LABEL" (eng.repo=<repo>); eng clean --containers --apply removes them with their volumes. Never docker volume prune -a.
+  evidence: per_pr # <e2e.evidence_dir>/pr-<n>/<sha>/; eng clean --evidence --apply clears merged or closed PRs.
+  # Clean up on merge or close (SHIPPING.md rule 18, §5): delete the PR's worktrees and evidence; one worktree per PR; no installs in review-only worktrees; shared package store and build cache; media off the box.
+
+
+hooks:
+  pre_commit: [] # optional extra commands; .githooks/pre-commit runs each in its own sh -c after drift-check, stack-check and lint, and stops at the first failure.
+
+gates:
+  skipped_is_failed: true # Schema constant.
+  required:
+    - lint
+    - doctor
