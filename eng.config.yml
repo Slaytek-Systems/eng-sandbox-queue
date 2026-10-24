@@ -181,6 +181,8 @@ merge:
       check: bash scripts/post-merge-check.sh
     stuck_minutes: 2
     verdict_wait_minutes: 2
+    tests_check: test
+    gate_workflow: gate.yml
 
 ship:
   # Shipping model (approved by Matt, 13 Oct 2026).
